@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAMP WAR</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a3a;
+    --accent: #ff4d00;
+    --accent2: #00d4ff;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --green: #39ff14;
+    --red: #ff2244;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    display: none;
+  }
+
+  canvas { display: block; }
+
+  /* ── LOBBY ── */
+  #lobby {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: clamp(3rem, 10vw, 7rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .logo span:first-child { color: var(--accent); }
+  .logo span:last-child { color: var(--accent2); }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .lobby-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+    width: min(460px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .lobby-card h2 {
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  label {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+
+  select option { background: var(--bg); }
+
+  .btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 13px 20px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: transparent; color: var(--accent2); border: 1px solid var(--accent2); }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  #room-code-display {
+    display: none;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    padding: 14px;
+    text-align: center;
+  }
+
+  #room-code-display .code {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+  }
+
+  #room-code-display p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  #status-msg {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 18px;
+  }
+
+  #status-msg.error { color: var(--red); }
+  #status-msg.ok { color: var(--green); }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+  }
+
+  #hud-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .hud-team-box {
+    background: rgba(10,10,15,0.82);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    min-width: 140px;
+  }
+
+  .hud-team-box .team-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .hud-team-box.defenders .team-label { color: var(--accent); }
+  .hud-team-box.attackers .team-label { color: var(--accent2); }
+
+  .player-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .player-pill {
+    font-size: 0.72rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .player-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .player-pill.alive .dot { background: var(--green); }
+  .player-pill.dead .dot { background: var(--red); opacity: 0.5; }
+  .player-pill.dead { opacity: 0.45; text-decoration: line-through; }
+
+  #hud-center-top {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  #round-timer {
+    background: rgba(10,10,15,0.9);
+    border: 1px solid var(--border);
+    padding: 6px 20px;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    min-width: 80px;
+  }
+
+  #round-timer.low { color: var(--accent); border-color: var(--accent); }
+
+  #hud-bottom {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #ammo-bar {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .ammo-rocket {
+    width: 10px;
+    height: 22px;
+    background: var(--accent);
+    clip-path: polygon(20% 100%, 80% 100%, 80% 25%, 100% 0, 80% 0, 50% 0, 20% 0, 0 0, 20% 25%);
+  }
+
+  .ammo-rocket.empty { background: var(--border); }
+
+  #weapon-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  #role-banner {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    background: rgba(10,10,15,0.85);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  #speed-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  #speed-bar-bg {
+    width: 120px;
+    height: 6px;
+    background: var(--border);
+  }
+
+  #speed-bar-fill {
+    height: 100%;
+    background: var(--accent2);
+    width: 0%;
+    transition: width 0.1s;
+  }
+
+  /* ── OVERLAY SCREENS ── */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.75);
+    z-index: 50;
+  }
+
+  .overlay.active { display: flex; }
+
+  .overlay-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 40px;
+    text-align: center;
+    min-width: 320px;
+  }
+
+  .overlay-card h1 {
+    font-size: 3rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+  }
+
+  .overlay-card h1.win { color: var(--green); }
+  .overlay-card h1.lose { color: var(--accent); }
+
+  .overlay-card p {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+
+  /* ── SPECTATOR ── */
+  #spectator-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    display: none;
+    z-index: 20;
+  }
+
+  #spectator-banner span {
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    display: block;
+    text-align: center;
+  }
+
+  #spectator-banner small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* ── CONTROLS HINT ── */
+  #controls-hint {
+    position: fixed;
+    bottom: 80px;
+    right: 16px;
+    background: rgba(10,10,15,0.82);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.8;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+  }
+
+  #controls-hint b { color: var(--text); }
+
+  /* ── WAITING ROOM ── */
+  #waiting-room {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    z-index: 90;
+    gap: 24px;
+  }
+
+  #waiting-room h2 {
+    font-size: 1.2rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  #waiting-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    max-width: 480px;
+  }
+
+  .waiting-player-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .waiting-player-chip .wdot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  #start-game-btn {
+    display: none;
+  }
+
+  #peer-status {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOBBY ── -->
+<div id="lobby">
+  <div class="logo">
+    <span>RAMP</span><span>WAR</span>
+  </div>
+  <div class="tagline">Cars vs RPG · Web Multiplayer</div>
+
+  <div class="lobby-card">
+    <h2>Join or Host</h2>
+
+    <div class="field-group">
+      <label>Your Name</label>
+      <input id="player-name" type="text" maxlength="14" placeholder="Enter your name" autocomplete="off" />
+    </div>
+
+    <div class="field-group">
+      <label>Team</label>
+      <select id="team-select">
+        <option value="auto">Auto-assign</option>
+        <option value="defenders">🔴 Defenders (RPG on platform)</option>
+        <option value="attackers">🔵 Attackers (cars on ramp)</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" id="host-btn">HOST GAME</button>
+
+    <div id="room-code-display">
+      <div class="code" id="room-code-text">----</div>
+      <p>Share this code with friends · Waiting for players…</p>
+    </div>
+
+    <div class="divider">or join existing</div>
+
+    <div class="field-group">
+      <label>Room Code</label>
+      <input id="join-code" type="text" maxlength="6" placeholder="6-letter code" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.15em;" />
+    </div>
+
+    <button class="btn btn-secondary" id="join-btn">JOIN GAME</button>
+
+    <div id="status-msg"></div>
+  </div>
+</div>
+
+<!-- ── WAITING ROOM ── -->
+<div id="waiting-room">
+  <div class="logo" style="font-size:2.5rem"><span>RAMP</span><span>WAR</span></div>
+  <h2>Waiting for Players</h2>
+  <div id="peer-status">Connecting…</div>
+  <div id="waiting-players"></div>
+  <button class="btn btn-primary" id="start-game-btn">START GAME</button>
+  <p style="font-size:0.72rem;color:var(--muted);">Host controls game start · Min 2 players</p>
+</div>
+
+<!-- ── GAME CANVAS ── -->
+<div id="canvas-container">
+  <canvas id="game-canvas"></canvas>
+</div>
+
+<!-- ── HUD ── -->
+<div id="hud">
+  <div id="hud-top">
+    <div class="hud-team-box defenders">
+      <div class="team-label">🔴 Defenders</div>
+      <div class="player-list" id="defenders-list"></div>
+    </div>
+
+    <div id="hud-center-top">
+      <div id="round-timer">2:00</div>
+    </div>
+
+    <div class="hud-team-box attackers">
+      <div class="team-label">🔵 Attackers</div>
+      <div class="player-list" id="attackers-list"></div>
+    </div>
+  </div>
+
+  <div id="hud-bottom">
+    <div id="weapon-label">RPG · ROCKETS</div>
+    <div id="ammo-bar"></div>
+    <div id="speed-bar-wrap">
+      <span>SPD</span>
+      <div id="speed-bar-bg"><div id="speed-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="role-banner">You are a DEFENDER — hold the platform!</div>
+</div>
+
+<div id="spectator-banner">
+  <span>💀 YOU'RE DEAD — SPECTATING</span>
+  <small>Watch the carnage unfold</small>
+</div>
+
+<div id="controls-hint">
+  <b>WASD / Arrows</b> — Move<br>
+  <b>Space</b> — Brake / Jump<br>
+  <b>Click</b> — Fire RPG / Boost<br>
+  <b>Mouse</b> — Aim
+</div>
+
+<!-- ── END GAME OVERLAY ── -->
+<div class="overlay" id="end-overlay">
+  <div class="overlay-card">
+    <h1 id="end-title" class="win">WIN</h1>
+    <p id="end-subtitle">Defenders held the platform!</p>
+    <button class="btn btn-primary" id="play-again-btn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
